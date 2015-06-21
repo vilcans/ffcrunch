@@ -1,5 +1,5 @@
 decomp_start EQU $0000
-decomp_end EQU decomp_start+$4000
+decomp_end EQU decomp_start+SIZE
 
 	org $8000
 
