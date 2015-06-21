@@ -24,7 +24,7 @@ decompress_loop:
 	jp nz,decompress_loop
 	ret
 
-	include "../z80/huffman.s"
+	include "../z80/huffman2.s"
 
 	org $8200
 huffman_tree:
