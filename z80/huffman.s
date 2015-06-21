@@ -1,5 +1,8 @@
-; Value that never occurs in uncompressed data, means non-leaf node
-;PARENT EQU $a5
+; Huffman decoder.
+; Assumes tree is less than 256 bytes and page aligned.
+; A magic value (PARENT) is used to mark a non-leaf node.
+; This has the effect that the uncompressed data may not contain
+; a byte with that value.
 
 ; Usage:
 ;   ld d,>huffman_tree    ; must be align 256
