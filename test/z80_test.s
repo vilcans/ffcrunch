@@ -7,7 +7,7 @@ decomp_end EQU decomp_start+SIZE
 	ret  ; must be at $8003, as breakpoint is set here
 
 do_test:
-	ld d,huffman_tree>>8    ; must be align 256
+	ld de,huffman_tree
 	ld hl,huffman_data
 	call init_decompress
 
@@ -24,7 +24,7 @@ decompress_loop:
 	jp nz,decompress_loop
 	ret
 
-	include "../z80/huffman2.s"
+	include "../z80/huffman1.s"
 
 	org $8200
 huffman_tree:
