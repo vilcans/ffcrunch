@@ -32,7 +32,11 @@ def bits_to_bytes(bits):
 
 
 def encode(symb2freq):
-    """Huffman encode the given dict mapping symbols to weights"""
+    """Huffman encode the given dict mapping symbols to weights
+
+    >>> encode({'A': 2, 'B': 1, 'C': 1})
+    [['A', '0'], ['B', '10'], ['C', '11']]
+    """
     heap = [[wt, [sym, ""]] for sym, wt in symb2freq.items()]
     heapify(heap)
     while len(heap) > 1:
@@ -43,29 +47,100 @@ def encode(symb2freq):
         for pair in hi[1:]:
             pair[1] = '1' + pair[1]
         heappush(heap, [lo[0] + hi[0]] + lo[1:] + hi[1:])
-    return sorted(heappop(heap)[1:], key=lambda p: (len(p[-1]), p))
+    return heappop(heap)[1:]
 
 
-def create_tree(data):
+def canonicalize(tree):
+    """Generate a "Canonical" Huffman tree.
+
+    >>> canonicalize([['A', '11'], ['B', '0'], ['C', '101'], ['D', '100']])
+    [('B', '0'), ('A', '10'), ('C', '110'), ('D', '111')]
+
+    See
+    https://en.wikipedia.org/wiki/Canonical_Huffman_code#Encoding_the_codebook
+    """
+    sorted_tree = sorted(tree, key=lambda p: (len(p[-1]), p))
+
+    result = []
+    new_code = 0
+    for index in xrange(len(sorted_tree)):
+        (symbol, old_code) = sorted_tree[index]
+
+        code_str = bin(new_code).split('b')[1]
+        code_str = '0' * (len(old_code) - len(code_str)) + code_str
+        assert len(code_str) == len(old_code), \
+            'Should have same length: ' + old_code + " and " + code_str
+        #print 'Old code ', old_code, 'new code', code_str
+        result.append((symbol, code_str))
+        new_code += 1
+        if index != len(sorted_tree) - 1:
+            length_diff = len(sorted_tree[index + 1][1]) - len(old_code)
+            new_code <<= length_diff
+
+    return result
+
+
+def create_tree(data, frequency_factor=1.0):
     """Returns list of [symbol, encoding]"""
 
     symb2freq = defaultdict(int)
     for ch in data:
         symb2freq[ch] += 1
-    # in Python 3.1+:
-    # symb2freq = collections.Counter(txt)
+
+    for symbol in symb2freq:
+        freq = symb2freq[symbol]
+        symb2freq[symbol] = int(
+            freq * frequency_factor + .5 / frequency_factor
+        )
+
     huff = encode(symb2freq)
-    #print "Symbol\tWeight\tHuffman Code"
-    #for p in huff:
-    #    print "%s\t%s\t%s" % (p[0], symb2freq[p[0]], p[1])
-    return dict(huff)
+    canonical = canonicalize(huff)
+    return canonical
 
 
-def compress(raw_data, tree=None):
-    if tree is None:
-        tree = dict(create_tree(raw_data))
-    bits = ''.join(tree[symbol] for symbol in raw_data)
+def compress(raw_data, tree):
+    tree_dict = dict(tree)
+    bits = ''.join(tree_dict[symbol] for symbol in raw_data)
     return bits_to_bytes(bits)
+
+
+def get_tree_height(tree):
+    """Gets the height of a tree
+
+    Assumes the tree is sorted by symbol length.
+    """
+    return len(tree[-1][1])
+
+
+def find_constrained_tree(raw_data, max_height):
+    """Find the best tree with a given maximum height"""
+    min_factor = 1e-9
+    max_factor = 1.0
+
+    factor = 1.0
+    for iteration in range(30):
+        tree = create_tree(raw_data, factor)
+        height = get_tree_height(tree)
+        print 'Factor', factor, 'height', height
+        if height <= max_height:
+            print 'trying right'
+            min_factor = factor
+        else:
+            print 'trying left'
+            max_factor = factor
+        factor = (min_factor + max_factor) * .5
+        print 'min', min_factor, 'max', max_factor, '=', factor
+        if min_factor == max_factor:
+            break
+
+    tree = create_tree(raw_data, min_factor)
+    height = get_tree_height(tree)
+    print 'Found tree of height', height, 'factor', factor
+    if height > max_height:
+        raise RuntimeError(
+            'Unable to find a tree with max height %s' % max_height
+        )
+    return tree
 
 
 def save_tree(tree, tree_file):
@@ -74,7 +149,7 @@ def save_tree(tree, tree_file):
         print '"parent node indicator" value occurs in raw data; can not use it'
         sys.exit(1)
 
-    tree_height = max(len(bits) for bits in tree.values())
+    tree_height = max(len(code) for (value, code) in tree)
     print 'Tree height', tree_height
 
     with open(tree_file, 'w') as out:
@@ -84,7 +159,7 @@ def save_tree(tree, tree_file):
         for level in xrange(tree_height + 1):
             out.write('\t; Level {}\n'.format(level))
             level_values = [(parent_node_value, '')] * (1 << level)
-            for (value, bits) in tree.iteritems():
+            for (value, bits) in tree:
                 if len(bits) == level:
                     level_values[int(bits, 2)] = (ord(value), bits)
             for v, b in level_values:
@@ -102,12 +177,18 @@ def main():
     parser.add_argument(
         'input', metavar='INPUT_FILE',
         help='File to compress')
+    parser.add_argument(
+        '--max-height', type=int, help='Maximum height of Huffman tree'
+    )
 
     args = parser.parse_args()
 
     raw_data = open(args.input).read()
-    tree = create_tree(raw_data)
-    print tree
+    if args.max_height:
+        tree = find_constrained_tree(raw_data, max_height=args.max_height)
+    else:
+        tree = create_tree(raw_data)
+    #print tree
     encoded = compress(raw_data, tree)
     save_tree(tree, args.tree)
     with open(args.data, 'wb') as out:
