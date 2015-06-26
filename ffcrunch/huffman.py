@@ -113,7 +113,13 @@ def get_tree_height(tree):
 
 
 def find_constrained_tree(raw_data, max_height):
-    """Find the best tree with a given maximum height"""
+    """Find the best tree with a given maximum height
+
+    To lower the tree height, we round the weights of the symbols
+    so the weights does not form fibonacci-like sequences, as described in
+    http://www.arturocampos.com/cp_ch3-4.html
+    """
+
     min_factor = 1e-9
     max_factor = 1.0
 
@@ -121,15 +127,11 @@ def find_constrained_tree(raw_data, max_height):
     for iteration in range(30):
         tree = create_tree(raw_data, factor)
         height = get_tree_height(tree)
-        print 'Factor', factor, 'height', height
         if height <= max_height:
-            print 'trying right'
             min_factor = factor
         else:
-            print 'trying left'
             max_factor = factor
         factor = (min_factor + max_factor) * .5
-        print 'min', min_factor, 'max', max_factor, '=', factor
         if min_factor == max_factor:
             break
 
