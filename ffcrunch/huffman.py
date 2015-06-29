@@ -9,6 +9,8 @@ from heapq import heappush, heappop, heapify
 from collections import defaultdict
 from array import array
 
+parent_node_value = 0xa5
+
 
 def bits_to_bytes(bits):
     """
@@ -197,19 +199,19 @@ def unpack_tree(serialized):
 
 def save_unpacked_tree_source(tree, out):
     tree_height = max(len(code) for (value, code) in tree)
-    print 'Tree height', tree_height
 
-    parent_node_value = 0xa5
     out.write('; Tree of height {}:\n'.format(tree_height))
     out.write('; {}\n'.format(str(tree)))
     for level in xrange(tree_height + 1):
-        out.write('\t; Level {}\n'.format(level))
         level_values = [(parent_node_value, '')] * (1 << level)
         for (value, bits) in tree:
+            i = int(bits, 2)
             if len(bits) == level:
                 level_values[int(bits, 2)] = (ord(value), bits)
-        for v, b in level_values:
-            out.write('\tdb ${:0>2x}  ; {:1}\n'.format(v, b))
+        for i, (v, b) in enumerate(level_values):
+            out.write(
+                '\tdb ${:0>2x}  ; {}.{} {}\n'.format(v, level, i, b)
+            )
 
 
 def save_tree(tree, out):
@@ -222,7 +224,6 @@ def save_tree(tree, out):
         1 byte: filler
         n*2 bytes: (length delta, symbol)
     """
-    parent_node_value = 0xa5
     if parent_node_value in tree:
         print '"parent node indicator" value occurs in raw data; can not use it'
         sys.exit(1)
