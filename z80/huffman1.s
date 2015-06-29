@@ -1,5 +1,5 @@
 ; Huffman decoder.
-; A magic value (PARENT) is used to mark a non-leaf node.
+; A magic value (INTERNAL) is used to mark a non-leaf node.
 ; This has the effect that the uncompressed data may not contain
 ; a byte with that value.
 
@@ -65,7 +65,7 @@ tree_height EQU $+1
 	rl d
 	inc de     ; DE = 2i+1 or 2i+2
 huff_construct_table_pointer EQU $+2
-	ld ix,$0000  ; TODO: remove these three; fill whole table with PARENT before instead
+	ld ix,$0000  ; TODO: remove these three; fill whole table with INTERNAL before instead
 	add ix,de
 huff_construct_internal_node_marker EQU $+3
 	ld (ix),0

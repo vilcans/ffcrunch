@@ -9,7 +9,7 @@ from heapq import heappush, heappop, heapify
 from collections import defaultdict
 from array import array
 
-parent_node_value = 0xa5
+internal_node_value = 0xa5
 
 
 def bits_to_bytes(bits):
@@ -203,7 +203,7 @@ def save_unpacked_tree_source(tree, out):
     out.write('; Tree of height {}:\n'.format(tree_height))
     out.write('; {}\n'.format(str(tree)))
     for level in xrange(tree_height + 1):
-        level_values = [(parent_node_value, '')] * (1 << level)
+        level_values = [(internal_node_value, '')] * (1 << level)
         for (value, bits) in tree:
             i = int(bits, 2)
             if len(bits) == level:
@@ -219,23 +219,23 @@ def save_tree(tree, out):
 
     Format:
         1 byte: height of tree, i.e. max code length (little endian)
-        1 byte: "parent node indicator"
+        1 byte: "internal node indicator"
         1 byte: number of symbols (n)
         1 byte: filler
         n*2 bytes: (length delta, symbol)
     """
-    if parent_node_value in tree:
-        print '"parent node indicator" value occurs in raw data; can not use it'
+    if internal_node_value in tree:
+        print '"internal node indicator" value occurs in raw data; can not use it'
         sys.exit(1)
 
     tree_height = get_tree_height(tree)
     print 'tree_height =', tree_height
-    print 'parent_node_value =', parent_node_value
+    print 'internal_node_value =', internal_node_value
     print 'tree_length =', len(tree)
     out.write(struct.pack(
         '<BBBB',
         tree_height,
-        parent_node_value,
+        internal_node_value,
         len(tree),
         0xff
     ))
