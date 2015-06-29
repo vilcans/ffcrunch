@@ -2,6 +2,8 @@
 
 import sys
 import argparse
+import struct
+import re
 
 from heapq import heappush, heappop, heapify
 from collections import defaultdict
@@ -29,6 +31,14 @@ def bits_to_bytes(bits):
         bits_in_byte += '0' * (8 - len(bits_in_byte))
         data.append(int(bits_in_byte, 2))
     return data
+
+
+def to_bits(value, length):
+    s = bin(value).split('b')[1]
+    assert len(s) <= length, 'Value ' + s + ' is longer than ' + str(length)
+    s = '0' * (length - len(s)) + s
+    assert len(s) == length
+    return s
 
 
 def encode(symb2freq):
@@ -66,18 +76,25 @@ def canonicalize(tree):
     for index in xrange(len(sorted_tree)):
         (symbol, old_code) = sorted_tree[index]
 
-        code_str = bin(new_code).split('b')[1]
-        code_str = '0' * (len(old_code) - len(code_str)) + code_str
+        if index != 0:
+            new_code = _get_next_code(
+                new_code, len(old_code) - len(sorted_tree[index - 1][1])
+            )
+
+        code_str = to_bits(new_code, len(old_code))
         assert len(code_str) == len(old_code), \
             'Should have same length: ' + old_code + " and " + code_str
         #print 'Old code ', old_code, 'new code', code_str
         result.append((symbol, code_str))
-        new_code += 1
-        if index != len(sorted_tree) - 1:
-            length_diff = len(sorted_tree[index + 1][1]) - len(old_code)
-            new_code <<= length_diff
 
     return result
+
+
+def _get_next_code(code, length_difference):
+    """Get the next code in canonical code order.
+    """
+    assert length_difference >= 0
+    return (code + 1) << length_difference
 
 
 def create_tree(data, frequency_factor=1.0):
@@ -145,34 +162,106 @@ def find_constrained_tree(raw_data, max_height):
     return tree
 
 
-def save_tree(tree, tree_file):
+def pack_tree(tree):
+    """Serialize the tree data.
+    Requires a canonical tree.
+    Returns: list of (code length delta, symbol)
+
+    >>> pack_tree([('B', '0'), ('A', '10'), ('C', '110'), ('D', '111')])
+    [(1, 'B'), (1, 'A'), (1, 'C'), (0, 'D')]
+    """
+    result = []
+    length = 0
+    for symbol, code in tree:
+        delta = len(code) - length
+        result.append((delta, symbol))
+        length = len(code)
+    return result
+
+
+def unpack_tree(serialized):
+    """
+    >>> unpack_tree([(1, 'B'), (1, 'A'), (1, 'C'), (0, 'D')])
+    [('B', '0'), ('A', '10'), ('C', '110'), ('D', '111')]
+    """
+    result = []
+    code = 0
+    code_length = 0
+    for i, (delta_length, symbol) in enumerate(serialized):
+        if i != 0:
+            code = _get_next_code(code, delta_length)
+        code_length += delta_length
+        result.append((symbol, to_bits(code, code_length)))
+    return result
+
+
+def save_unpacked_tree_source(tree, out):
+    tree_height = max(len(code) for (value, code) in tree)
+    print 'Tree height', tree_height
+
+    parent_node_value = 0xa5
+    out.write('; Tree of height {}:\n'.format(tree_height))
+    out.write('; {}\n'.format(str(tree)))
+    for level in xrange(tree_height + 1):
+        out.write('\t; Level {}\n'.format(level))
+        level_values = [(parent_node_value, '')] * (1 << level)
+        for (value, bits) in tree:
+            if len(bits) == level:
+                level_values[int(bits, 2)] = (ord(value), bits)
+        for v, b in level_values:
+            out.write('\tdb ${:0>2x}  ; {:1}\n'.format(v, b))
+
+
+def save_tree(tree, out):
+    """Saves the packed tree in binary format.
+
+    Format:
+        1 byte: height of tree, i.e. max code length (little endian)
+        1 byte: "parent node indicator"
+        1 byte: number of symbols (n)
+        1 byte: filler
+        n*2 bytes: (length delta, symbol)
+    """
     parent_node_value = 0xa5
     if parent_node_value in tree:
         print '"parent node indicator" value occurs in raw data; can not use it'
         sys.exit(1)
 
-    tree_height = max(len(code) for (value, code) in tree)
-    print 'Tree height', tree_height
+    tree_height = get_tree_height(tree)
+    print 'tree_height =', tree_height
+    print 'parent_node_value =', parent_node_value
+    print 'tree_length =', len(tree)
+    out.write(struct.pack(
+        '<BBBB',
+        tree_height,
+        parent_node_value,
+        len(tree),
+        0xff
+    ))
 
-    with open(tree_file, 'w') as out:
-        out.write('; Tree of height {}:\n'.format(tree_height))
-        out.write('; {}\n'.format(str(tree)))
-        out.write('PARENT equ ${:0>2x}\n'.format(parent_node_value))
-        for level in xrange(tree_height + 1):
-            out.write('\t; Level {}\n'.format(level))
-            level_values = [(parent_node_value, '')] * (1 << level)
-            for (value, bits) in tree:
-                if len(bits) == level:
-                    level_values[int(bits, 2)] = (ord(value), bits)
-            for v, b in level_values:
-                out.write('\tdb ${:0>2x}  ; {:1}\n'.format(v, b))
+    bits = ''
+    for (symbol, code) in tree:
+        # code length, code (word, little endian), symbol
+        bits += '[codelen]'
+        bits += to_bits(len(code), tree_height)
+        bits += '[code]'
+        bits += code
+        bits += '[symbol]'
+        bits += to_bits(ord(symbol), 8)
+
+    print 'bits:', bits
+    bits = re.sub(r'[^01]', '', bits)
+    out.write(bits_to_bytes(bits))
 
 
 def main():
     parser = argparse.ArgumentParser(description='Huffman encoder')
     parser.add_argument(
-        '--tree', metavar='FILE', required=True,
+        '--tree', metavar='FILE', required=True, type=argparse.FileType('wb'),
         help='Save Huffman tree to this file')
+    parser.add_argument(
+        '--stree', metavar='FILE', required=True, type=argparse.FileType('w'),
+        help='Save unpacked Huffman tree to this assembly source file')
     parser.add_argument(
         '--data', metavar='FILE', required=True,
         help='Save Huffman encoded data to this file')
@@ -193,6 +282,8 @@ def main():
     #print tree
     encoded = compress(raw_data, tree)
     save_tree(tree, args.tree)
+    if args.stree:
+        save_unpacked_tree_source(tree, args.stree)
     with open(args.data, 'wb') as out:
         out.write(encoded)
 

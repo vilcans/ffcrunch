@@ -7,8 +7,12 @@ decomp_end EQU decomp_start+SIZE
 	ret  ; must be at $8003, as breakpoint is set here
 
 do_test:
+	ld hl,packed_tree
 	ld de,huffman_tree
+	call construct_tree
+
 	ld hl,huffman_data
+	ld de,huffman_tree
 	call init_decompress
 
 	ld ix,decomp_start
@@ -28,6 +32,10 @@ decompress_loop:
 
 	org $8200
 huffman_tree:
-	include "testdata_tree.i"
+	ds $800
+
+	org $9000
+packed_tree:
+	incbin "testdata.hufftree"
 huffman_data:
 	incbin "testdata.huff"
