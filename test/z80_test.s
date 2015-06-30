@@ -36,6 +36,6 @@ huffman_tree:
 
 	org $9000
 packed_tree:
-	incbin "testdata.hufftree"
+	incbin "testdata.bin.tree"
 huffman_data:
-	incbin "testdata.huff"
+	incbin "testdata.bin.huff"

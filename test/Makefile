@@ -1,6 +1,6 @@
 include ../common.mk
 
-test: testdata.huff
+test: testdata.bin.huff
 	./z80_test.sh
 
 .PHONY: test
