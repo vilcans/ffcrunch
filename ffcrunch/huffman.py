@@ -220,7 +220,7 @@ def save_tree(tree, out):
     Format:
         1 byte: height of tree, i.e. max code length (little endian)
         1 byte: "internal node indicator"
-        1 byte: number of symbols (n)
+        1 byte: number of symbols (n) (0 for 256)
         1 byte: filler
         n*2 bytes: (length delta, symbol)
     """
@@ -231,12 +231,12 @@ def save_tree(tree, out):
     tree_height = get_tree_height(tree)
     print 'tree_height =', tree_height
     print 'internal_node_value =', internal_node_value
-    print 'tree_length =', len(tree)
+    print 'number_of_symbols =', len(tree)
     out.write(struct.pack(
         '<BBBB',
         tree_height,
         internal_node_value,
-        len(tree),
+        len(tree) & 0xff,
         0xff
     ))
 
