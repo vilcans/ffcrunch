@@ -4,3 +4,4 @@ testdata.bin.huff
 testdata.bin.tree
 testdata_tree.i
 z80_test.hex
+size-results.csv

@@ -1,0 +1,41 @@
+#!/bin/bash -e
+
+DIR=$(cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd)
+
+HEIGHTS='8 9 10 11 99'
+RESULTS=$DIR/size-results.csv
+
+echo >$RESULTS -n 'File Orig '
+for HEIGHT in $HEIGHTS
+do
+    echo >>$RESULTS -n "Huff_$HEIGHT "
+done
+echo >>$RESULTS -n 'RLE '
+for HEIGHT in $HEIGHTS
+do
+    echo >>$RESULTS -n "Rle_Huff_$HEIGHT "
+done
+echo >>$RESULTS
+
+for DATA_FILE in data/*.bin
+do
+    echo >>$RESULTS -n "${DATA_FILE} "
+
+    make -B ${DATA_FILE}.rle
+    HUFF_FILES=''
+    RLE_HUFF_FILES=''
+    for HEIGHT in $HEIGHTS
+    do
+        NAME=${DATA_FILE}_$HEIGHT
+        cp $DATA_FILE $NAME
+        HUFF_FILES="$HUFF_FILES ${NAME}.huff"
+        RLE_HUFF_FILES="$RLE_HUFF_FILES ${NAME}.rle.huff"
+        make -B MAX_HEIGHT=$HEIGHT ${NAME}.huff ${NAME}.rle.huff
+    done
+
+    for FILE in ${DATA_FILE} $HUFF_FILES ${DATA_FILE}.rle $RLE_HUFF_FILES
+    do
+        stat >>$RESULTS --printf='%s ' ${FILE}
+    done
+    echo >>$RESULTS
+done

@@ -1,0 +1,5 @@
+*.huff
+*.rle
+*.tree
+*_tree.i
+*_*
