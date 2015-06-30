@@ -4,9 +4,10 @@ from array import array
 
 min_repeats = 3
 max_repeats = 127 + min_repeats
+max_verbatim = 128
 
 
-def get_run_length(data, from_index, max_repeats):
+def get_run_length(data, from_index):
     run_length = 1
     value = data[from_index]
     max_len = min(len(data) - from_index, max_repeats)
@@ -19,21 +20,18 @@ def find_runs(data):
     run_start = 0
     i = 0
     while run_start + i < len(data):
-        run_length = get_run_length(data, run_start + i, max_repeats)
+        run_length = get_run_length(data, run_start + i)
         if run_length >= min_repeats:
-            #print 'Uncompressed', data[run_start:run_start+i]
             if i != 0:
-                yield None, data[run_start:run_start+i]
+                yield None, data[run_start:run_start + i]
             yield run_length, data[run_start + i]
-            #print data[run_start + i], 'repeated', run_length
             run_start = run_start + i + run_length
             i = 0
         else:
             i += run_length
-            # TODO: check for overflow in i
 
     if i != 0:
-        yield None, data[run_start:run_start+i]
+        yield None, data[run_start:run_start + i]
 
 
 # 0 = repeat next byte 3 times (assuming min_repeats=3)
@@ -69,12 +67,18 @@ def decompress(data):
 
 def compress(data):
     """
-    Verbatim data is encoded as (256-length) followed by the data.
+    Verbatim data is encoded as (256 - length) followed by the data.
 
     >>> compress(array('B', [42]))
     array('B', [255, 42])
     >>> compress(array('B', [2, 3, 4, 5]))
     array('B', [252, 2, 3, 4, 5])
+
+    Long stretches of verbatim data are encoded as several blocks.
+    For example, 130 values will be a block of 128 then a block of 2:
+
+    >>> compress(array('B', range(130)))  # doctest: +ELLIPSIS
+    array('B', [128, 0, 1, 2, ..., 127, 254, 128, 129])
 
     Repeated values are encoded as (number_of_repeats - min_repeats):
 
@@ -82,6 +86,10 @@ def compress(data):
     array('B', [2, 1])
     >>> compress(array('B', [1, 1, 1]))
     array('B', [0, 1])
+
+    Really long repeated values are encoded as several runs:
+    >>> compress(array('B', [42] * 231))
+    array('B', [127, 42, 98, 42])
 
     Repeated runs shorter than min_repeats are coded as verbatim data:
 
@@ -101,10 +109,17 @@ def compress(data):
             result.append(header)
             result.append(value)
         else:
-            header = 256 - len(runs)
-            assert 128 <= header <= 255, 'Out of range: ' + str(header)
-            result.append(header)
-            result += array('B', runs)
+            while len(runs) > max_verbatim:
+                #print 'cutting off', max_verbatim, 'from', runs
+                result.append(128)
+                result += array('B', runs[:max_verbatim])
+                runs = runs[max_verbatim:]
+            #print 'cutting done; verbatim data left:', runs
+            if runs != '':
+                header = 256 - len(runs)
+                assert 128 <= header <= 255, 'Out of range: ' + str(header)
+                result.append(header)
+                result += array('B', runs)
     return result
 
 

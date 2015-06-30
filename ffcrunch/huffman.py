@@ -218,7 +218,7 @@ def save_tree(tree, out):
     """Saves the packed tree in binary format.
 
     Format:
-        1 byte: height of tree, i.e. max code length (little endian)
+        1 byte: height of tree, i.e. max code length
         1 byte: "internal node indicator"
         1 byte: number of symbols (n) (0 for 256)
         1 byte: filler
