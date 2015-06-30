@@ -15,7 +15,7 @@ def get_run_length(data, from_index, max_repeats):
     return run_length
 
 
-def find_runs(data, min_repeats=3, max_repeats=128):
+def find_runs(data):
     run_start = 0
     i = 0
     while run_start + i < len(data):
@@ -42,12 +42,12 @@ def find_runs(data, min_repeats=3, max_repeats=128):
 # .
 # .
 # 127 = repeat next byte 130 times
-# 128 = repeat next byte 128 times
-# 129 = repeat next byte 127 times
+# 128 = copy next 128 bytes verbatim
+# 129 = copy next 127 bytes verbatim
 # .
 # .
-# 254 = repeat next byte 2 times
-# 255 = repeat next byte 1 time
+# 254 = copy next 2 bytes verbatim
+# 255 = copy next 1 byte verbatim
 
 
 def decompress(data):
@@ -68,11 +68,30 @@ def decompress(data):
 
 
 def compress(data):
-    result = array('B')
-    #max_repeats = 10
+    """
+    Verbatim data is encoded as (256-length) followed by the data.
 
-    for compress, runs in find_runs(data, max_repeats=max_repeats):
-        print 'compress', compress, 'runs', runs
+    >>> compress(array('B', [42]))
+    array('B', [255, 42])
+    >>> compress(array('B', [2, 3, 4, 5]))
+    array('B', [252, 2, 3, 4, 5])
+
+    Repeated values are encoded as (number_of_repeats - min_repeats):
+
+    >>> compress(array('B', [1, 1, 1, 1, 1]))
+    array('B', [2, 1])
+    >>> compress(array('B', [1, 1, 1]))
+    array('B', [0, 1])
+
+    Repeated runs shorter than min_repeats are coded as verbatim data:
+
+    >>> compress(array('B', [1, 1]))
+    array('B', [254, 1, 1])
+    """
+
+    result = array('B')
+
+    for compress, runs in find_runs(data):
         if compress:
             repeats, value = compress, runs
             # Format (repeats, value)
