@@ -6,10 +6,10 @@
 ; Usage:
 ;   ld hl,packed_tree
 ;   ld de,huffman_tree
+;   push de
 ;   call construct_tree
-;
-;   ld hl,compressed_data
-;   ld de,huffman_tree
+;   ; HL now points to start of compressed data
+;   pop de
 ;   call init_decompress
 ;
 ;   call get_next_byte
@@ -23,10 +23,14 @@
 ; so that the child nodes of index i are at
 ; (2i+1) and (2i+2) for left and right child respectively.
 
+
 ; Unpack the Huffman tree into its runtime representation.
 ; Input:
-;   HL = packed tree
-;   DE = unpacked tree
+;   HL = packed tree (source)
+;   DE = unpacked tree (target)
+; Output:
+;   HL = after the tree data, typically start of encoded data
+;   DE = modified
 construct_tree:
 	ld (huff_construct_table_pointer),de
 	ld a,(hl)   ; A = tree height

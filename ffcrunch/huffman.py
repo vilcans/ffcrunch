@@ -258,14 +258,17 @@ def save_tree(tree, out):
 def main():
     parser = argparse.ArgumentParser(description='Huffman encoder')
     parser.add_argument(
-        '--tree', metavar='FILE', required=True, type=argparse.FileType('wb'),
+        '--out', '-o', metavar='FILE', type=argparse.FileType('wb'),
+        help='Save Huffman tree and data to this file')
+    parser.add_argument(
+        '--tree', metavar='FILE', type=argparse.FileType('wb'),
         help='Save Huffman tree to this file')
     parser.add_argument(
-        '--stree', metavar='FILE', required=True, type=argparse.FileType('w'),
+        '--stree', metavar='FILE', type=argparse.FileType('w'),
         help='Save unpacked Huffman tree to this assembly source file')
     parser.add_argument(
-        '--data', metavar='FILE', required=True,
-        help='Save Huffman encoded data to this file')
+        '--data', metavar='FILE', type=argparse.FileType('wb'),
+        help='Save Huffman encoded data to this file, without tree data')
     parser.add_argument(
         'input', metavar='INPUT_FILE',
         help='File to compress')
@@ -280,13 +283,17 @@ def main():
         tree = find_constrained_tree(raw_data, max_height=args.max_height)
     else:
         tree = create_tree(raw_data)
-    #print tree
+
     encoded = compress(raw_data, tree)
-    save_tree(tree, args.tree)
+    if args.tree:
+        save_tree(tree, args.tree)
     if args.stree:
         save_unpacked_tree_source(tree, args.stree)
-    with open(args.data, 'wb') as out:
-        out.write(encoded)
+    if args.data:
+        args.data.write(encoded)
+    if args.out:
+        save_tree(tree, args.out)
+        args.out.write(encoded)
 
 if __name__ == '__main__':
     main()
